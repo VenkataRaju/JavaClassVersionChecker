@@ -32,7 +32,7 @@ public final class ClassVersionChecker
 	{
 		System.out
 				.println(
-				"Usage: java -jar class-version-checker-<version>.jar [-e] [-v] Path1 Path2 ..\n"
+				"Usage: java -jar java-class-version-checker-<version>.jar [-e] [-v] Path1 Path2 ..\n"
 						+ "-e Comma separated list of file extensions. e.g. jar,war,class,.. \n"
 						+ "   default: scans all the jar files in the provided paths\n"
 						+ "-v Verbosity. Valid values are 1(default) and 2\n"
@@ -42,10 +42,10 @@ public final class ClassVersionChecker
 						+ "      -gv Group by Java version\n"
 						+ "   2: Scans all class files in an archive and lists all the files in output\n"
 						+ "Path can be any folder or file which matches the provided extension\n"
-						+ "e.g. 1. java jar-class-target-java-version-checker-<version>.jar Folder1 Folder2\n"
-						+ "     2. java jar-class-target-java-version-checker-<version>.jar -e war,ear xyz.war abc.ear Folder2\n"
-						+ "     3. java jar-class-target-java-version-checker-<version>.jar abc.jar\n"
-						+ "     4. java jar-class-target-java-version-checker-<version>.jar -e class,jar abc.jar Xyz.class Folder\n"
+						+ "e.g. 1. java -jar java-class-version-checker-<version>.jar Folder1 Folder2\n"
+						+ "     2. java -jar java-class-version-checker-<version>.jar -e war,ear xyz.war abc.ear Folder2\n"
+						+ "     3. java -jar java-class-version-checker-<version>.jar abc.jar\n"
+						+ "     4. java -jar java-class-version-checker-<version>.jar -e class,jar abc.jar Xyz.class Folder\n"
 						+ "Note: Except 'class' all other files (with matching extension e.g. war,zip,ear) will be considered as a compressed zip files\n");
 	}
 
