@@ -93,7 +93,7 @@ final class Scanner
 		String fileName = file.getName();
 		String fileExtn = fileExtn(fileName);
 
-		if ("class".equals(fileExtn))
+		if (fileExtn.equals("class"))
 		{
 			FileInputStream fis = null;
 			try
