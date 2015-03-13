@@ -95,7 +95,6 @@ final class Scanner
 
 		if ("class".equals(fileExtn))
 		{
-
 			FileInputStream fis = null;
 			try
 			{
