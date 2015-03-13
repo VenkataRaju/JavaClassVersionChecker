@@ -91,9 +91,9 @@ final class Scanner
 		}
 
 		String fileName = file.getName();
-		String fileExtn = fileName.substring(fileName.lastIndexOf('.') + 1);
+		String fileExtn = fileExtn(fileName);
 
-		if (fileExtn.equals("class"))
+		if ("class".equals(fileExtn))
 		{
 
 			FileInputStream fis = null;
