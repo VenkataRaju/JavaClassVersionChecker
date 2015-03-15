@@ -24,10 +24,8 @@ final class Version implements Comparable<Version>
 	public int hashCode()
 	{
 		final int prime = 31;
-		int result = prime + classMajor;
+		int result = prime * +classMajor;
 		result = prime * result + classMinor;
-		result = prime * result + javaMajor;
-		result = prime * result + javaMinor;
 		return result;
 	}
 
@@ -36,18 +34,14 @@ final class Version implements Comparable<Version>
 	{
 		if (!(obj instanceof Version))
 			return false;
-		Version that = (Version) obj;
-		return (this == that)
-				|| (javaMajor == that.javaMajor && javaMinor == that.javaMinor
-						&& classMajor == that.classMajor && classMinor == that.classMinor);
+		Version other = (Version) obj;
+		return (this == other) || (classMajor == other.classMajor && classMinor == other.classMinor);
 	}
 
 	public int compareTo(Version o)
 	{
-		return javaMajor < o.javaMajor ? -1 : javaMajor > o.javaMajor ? 1 :
-				javaMinor < o.javaMinor ? -1 : javaMinor > o.javaMinor ? 1 :
-						classMajor < o.classMajor ? -1 : classMajor > o.classMajor ? 1 :
-								classMinor < o.classMinor ? -1 : classMinor > o.classMinor ? 1 : 0;
+		return classMajor < o.classMajor ? -1 : classMajor > o.classMajor ? 1 :
+				classMinor < o.classMinor ? -1 : classMinor > o.classMinor ? 1 : 0;
 	}
 
 	static Version fromClassVersion(int classMajor, int classMinor)

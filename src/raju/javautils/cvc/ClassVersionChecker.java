@@ -31,22 +31,20 @@ public final class ClassVersionChecker
 	private static void printUsage()
 	{
 		System.out
-				.println(
-				"Usage: java -jar java-class-version-checker-<version>.jar [-e] [-v] Path1 Path2 ..\n"
-						+ "-e Comma separated list of file extensions. e.g. jar,war,class,.. \n"
-						+ "   default: scans all the jar files in the provided paths\n"
-						+ "-v Verbosity. Valid values are 1(default) and 2\n"
-						+ "   1: Scans all the class files in an archive. Prints stats\n"
-						+ "      Outputs version, no. of classes, jar file and other versions of class files found in the archive\n"
-						+ "      -gc(default) Group by container e.g. folder, archive \n"
-						+ "      -gv Group by Java version\n"
-						+ "   2: Scans all class files in an archive and lists all the files in output\n"
-						+ "Path can be any folder or file which matches the provided extension\n"
-						+ "e.g. 1. java -jar java-class-version-checker-<version>.jar Folder1 Folder2\n"
-						+ "     2. java -jar java-class-version-checker-<version>.jar -e war,ear xyz.war abc.ear Folder2\n"
-						+ "     3. java -jar java-class-version-checker-<version>.jar abc.jar\n"
-						+ "     4. java -jar java-class-version-checker-<version>.jar -e class,jar abc.jar Xyz.class Folder\n"
-						+ "Note: Except 'class' all other files (with matching extension e.g. war,zip,ear) will be considered as a compressed zip files\n");
+				.printf(
+				"Usage: java -jar java-class-version-checker-<version>.jar [-e] [-v] Path1 Path2 ..%n"
+						+ "-e Comma separated list of file extensions. e.g. jar(default),war,class,.. %n"
+						+ "-v Verbosity. Valid values are 1(default) and 2%n"
+						+ "   1: Prints stats: version, no. of classes, jar file and other versions of class files found in the archive%n"
+						+ "      -gc(default) Group by container e.g. folder, archive%n"
+						+ "      -gv Group by Java version%n"
+						+ "   2: Lists all the files with version in the output%n"
+						+ "Path can be any folder or file which matches the provided extension(s)%n"
+						+ "e.g. 1. java -jar java-class-version-checker-<version>.jar Folder1 Folder2%n"
+						+ "     2. java -jar java-class-version-checker-<version>.jar -e jar,war,ear xyz.war abc.ear Folder2%n"
+						+ "     3. java -jar java-class-version-checker-<version>.jar abc.jar%n"
+						+ "     4. java -jar java-class-version-checker-<version>.jar -e class,jar abc.jar Xyz.class FolderWhichContainsClasses%n"
+						+ "Note: Except 'class' all other files (with matching extension e.g. war,zip,ear) will be considered as compressed zip files%n");
 	}
 
 	public static void main(String[] args)
@@ -73,7 +71,11 @@ public final class ClassVersionChecker
 		List<String> params = new ArrayList<String>(Arrays.asList(args));
 
 		String extnsStr = (extnsStr = getParamValue(params, "-e")) == null ? "jar" : extnsStr;
-		final Set<String> fileExtns = new HashSet<String>(Arrays.asList(extnsStr.split(",\\s*")));
+		String[] fileExtnsArr = extnsStr.split(",");
+		final Set<String> fileExtns = new HashSet<String>();
+		for (String fileExtn : fileExtnsArr)
+			if ((fileExtn = fileExtn.trim()).length() != 0)
+				fileExtns.add(fileExtn);
 
 		String verbosityStr = (verbosityStr = getParamValue(params, "-v")) == null ? "1" : verbosityStr;
 		if (!Arrays.asList("1", "2").contains(verbosityStr))
@@ -88,11 +90,8 @@ public final class ClassVersionChecker
 		boolean groupByContainer0 = true;
 		if (verbosity == 1)
 		{
-			if (params.contains("-gv"))
-			{
+			if (params.remove("-gv"))
 				groupByContainer0 = false;
-				params.remove("-gv");
-			}
 			else
 				params.remove("-gc");
 		}
@@ -125,15 +124,15 @@ public final class ClassVersionChecker
 		se.scheduleWithFixedDelay(new Runnable()
 		{
 			private final Map<Version, Set<String>> containerPathsByVersion;
-			private final Map<String, Map<Version, Integer>> noOfClassesByVersionByContainerPath;
+			private final Map<String, Map<Version, MutableInteger>> noOfClassesByVersionByContainerPath;
 
 			private final Map<Version, List<Result.Success>> successByVersion;
 
 			{
 				if (verbosity == 1)
 				{
-					containerPathsByVersion = new TreeMap<Version, Set<String>>();
-					noOfClassesByVersionByContainerPath = new LinkedHashMap<String, Map<Version, Integer>>();
+					containerPathsByVersion = groupByContainer ? new TreeMap<Version, Set<String>>() : null;
+					noOfClassesByVersionByContainerPath = new LinkedHashMap<String, Map<Version, MutableInteger>>();
 					successByVersion = null;
 				}
 				else if (verbosity == 2)
@@ -182,19 +181,23 @@ public final class ClassVersionChecker
 
 					if (verbosity == 1)
 					{
-						Set<String> containerPaths = containerPathsByVersion.get(success.version);
-						if (containerPaths == null)
-							containerPathsByVersion.put(success.version, containerPaths = new LinkedHashSet<String>());
-						containerPaths.add(success.containerPath);
+						if (groupByContainer)
+						{
+							Set<String> containerPaths = containerPathsByVersion.get(success.version);
+							if (containerPaths == null)
+								containerPathsByVersion.put(success.version, containerPaths = new LinkedHashSet<String>());
+							containerPaths.add(success.containerPath);
+						}
 
-						Map<Version, Integer> noOfClassesByVersion = noOfClassesByVersionByContainerPath.get(success.containerPath);
+						Map<Version, MutableInteger> noOfClassesByVersion = noOfClassesByVersionByContainerPath.get(success.containerPath);
 						if (noOfClassesByVersion == null)
 							noOfClassesByVersionByContainerPath
-									.put(success.containerPath, noOfClassesByVersion = new TreeMap<Version, Integer>());
+									.put(success.containerPath, noOfClassesByVersion = new TreeMap<Version, MutableInteger>());
 
-						Integer noOfClasses = noOfClassesByVersion.get(success.version);
-						noOfClasses = noOfClasses == null ? 1 : noOfClasses + 1;
-						noOfClassesByVersion.put(success.version, noOfClasses);
+						MutableInteger noOfClasses = noOfClassesByVersion.get(success.version);
+						if (noOfClasses == null)
+							noOfClassesByVersion.put(success.version, noOfClasses = new MutableInteger());
+						noOfClasses.increment();
 					}
 					else
 					{
@@ -223,7 +226,7 @@ public final class ClassVersionChecker
 			{
 				if (verbosity == 1)
 				{
-					if (containerPathsByVersion.isEmpty())
+					if (noOfClassesByVersionByContainerPath.isEmpty())
 						System.out.println("No files/classes found");
 					else
 					{
@@ -238,7 +241,7 @@ public final class ClassVersionChecker
 						if (groupByContainer)
 						{
 							boolean moreThanOneversionInContainer = false;
-							for (Map<Version, Integer> map : noOfClassesByVersionByContainerPath.values())
+							for (Map<Version, MutableInteger> map : noOfClassesByVersionByContainerPath.values())
 							{
 								if (map.size() > 1)
 								{
@@ -251,13 +254,13 @@ public final class ClassVersionChecker
 									+ (moreThanOneversionInContainer ? 2 * SPACE_FOR_VERSION : SPACE_FOR_VERSION) + "s %s%n";
 
 							StringBuilder versionInfo = new StringBuilder();
-							for (Entry<String, Map<Version, Integer>> entry : noOfClassesByVersionByContainerPath.entrySet())
+							for (Entry<String, Map<Version, MutableInteger>> entry : noOfClassesByVersionByContainerPath.entrySet())
 							{
 								String containerPath = entry.getKey();
 								String containerName = containerName(containerPath);
 
 								versionInfo.setLength(0);
-								for (Entry<Version, Integer> entry2 : entry.getValue().entrySet())
+								for (Entry<Version, MutableInteger> entry2 : entry.getValue().entrySet())
 								{
 									Version version = entry2.getKey();
 									versionInfo.append(versionStr(version)).append("(").append(entry2.getValue()).append("),");

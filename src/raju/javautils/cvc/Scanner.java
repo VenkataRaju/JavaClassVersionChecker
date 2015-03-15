@@ -10,7 +10,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
@@ -20,6 +19,16 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
+/**
+ * Scans .class files for their Version in the folders and the archive files
+ * <p>
+ * Note: Inscances of this class can't be reused. i.e.
+ * {@linkplain Scanner#scan()} method can be called only once.
+ */
+/**
+ * @author djc867
+ *
+ */
 final class Scanner
 {
 	private final Collection<File> inputPathsToScan;
@@ -38,8 +47,8 @@ final class Scanner
 	 */
 	Scanner(Collection<File> inputPathsToScan, final Set<String> fileExtns)
 	{
-		this.inputPathsToScan = inputPathsToScan;
-		this.fileExtns = fileExtns;
+		this.inputPathsToScan = Util.checkNotNull(inputPathsToScan);
+		this.fileExtns = Util.checkNotNull(fileExtns);
 		this.fileFilter = new FileFilter()
 		{
 			public boolean accept(File file)
@@ -86,7 +95,7 @@ final class Scanner
 	{
 		if (!file.exists())
 		{
-			results.add(Result.failure("Not able to find file: " + file.getAbsolutePath()));
+			results.add(Result.failure("Unable to find file: " + file.getAbsolutePath()));
 			return;
 		}
 
@@ -95,12 +104,11 @@ final class Scanner
 
 		if (fileExtn.equals("class"))
 		{
-			FileInputStream fis = null;
+			InputStream is = null;
 			try
 			{
-				fis = new FileInputStream(file);
-
-				findClassVersion(file.getName(), file.getParentFile().getPath(), fis);
+				is = new FileInputStream(file);
+				findClassVersion(file.getName(), file.getParentFile().getPath(), is);
 			}
 			catch (IOException e)
 			{
@@ -108,7 +116,7 @@ final class Scanner
 			}
 			finally
 			{
-				close(fis);
+				close(is);
 			}
 		}
 		else
@@ -119,9 +127,8 @@ final class Scanner
 			{
 				zipFile = new ZipFile(file);
 
-				for (Enumeration<? extends ZipEntry> entries = zipFile.entries(); entries.hasMoreElements();)
+				for (ZipEntry zipEntry : Collections.list(zipFile.entries()))
 				{
-					ZipEntry zipEntry = entries.nextElement();
 					if (zipEntry.isDirectory())
 						continue;
 
@@ -131,6 +138,8 @@ final class Scanner
 					InputStream is = null;
 					try
 					{
+						// Note: zipEntryExtn may be null, so keeping the "class" string
+						// first in the equals check
 						if ("class".equals(zipEntryExtn))
 						{
 							is = zipFile.getInputStream(zipEntry);
@@ -147,7 +156,6 @@ final class Scanner
 					{
 						close(is);
 					}
-
 				}
 			}
 			catch (ZipException e)
@@ -191,6 +199,8 @@ final class Scanner
 
 			try
 			{
+				// Note: zipEntryExtn may be null, so keeping the "class" string
+				// first in the equals check
 				if ("class".equals(zipEntryExtn))
 					findClassVersion(entryName, containerPath, zipInputStream);
 				else if (fileExtns.contains(fileExtn(entryName)))
@@ -206,6 +216,12 @@ final class Scanner
 		}
 	}
 
+	/**
+	 * File extension without dot. e.g. class for a .class file.
+	 * <p>
+	 * This method expects that there is at least one character before the dot(.)
+	 * and one character after the dot(.). Otherwise returns null
+	 */
 	private static String fileExtn(String fileName)
 	{
 		int dotIndex = fileName.lastIndexOf('.');
@@ -213,6 +229,10 @@ final class Scanner
 				? fileName.substring(dotIndex) : null;
 	}
 
+	/**
+	 * Replaces separators in {@code zipEntryName} with platform specific
+	 * separator
+	 */
 	private static String platformEntryName(String zipEntryName)
 	{
 		return zipEntryName.replace('/', File.separatorChar);
