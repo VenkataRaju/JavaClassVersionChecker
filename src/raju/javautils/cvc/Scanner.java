@@ -25,10 +25,6 @@ import java.util.zip.ZipInputStream;
  * Note: Inscances of this class can't be reused. i.e.
  * {@linkplain Scanner#scan()} method can be called only once.
  */
-/**
- * @author djc867
- *
- */
 final class Scanner
 {
 	private final Collection<File> inputPathsToScan;
