@@ -22,7 +22,7 @@ import java.util.zip.ZipInputStream;
 /**
  * Scans .class files for their Version in the folders and the archive files
  * <p>
- * Note: Inscances of this class can't be reused. i.e.
+ * Note: Instances of this class can't be reused. i.e.
  * {@linkplain Scanner#scan()} method can be called only once.
  */
 final class Scanner
