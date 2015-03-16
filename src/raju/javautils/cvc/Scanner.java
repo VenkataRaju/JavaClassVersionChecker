@@ -35,7 +35,7 @@ final class Scanner
 
 	private boolean used;
 
-	private volatile int noOfFilesScanned;
+	private volatile int noOfFilesScanned, noOfClassFilesScanned;
 
 	/**
 	 * Note: {@code extns} should not start with .(dot) e.g. for valid extensions:
@@ -70,9 +70,14 @@ final class Scanner
 		}
 	}
 
-	int getNoOfFilesScanned()
+	public int getNoOfFilesScanned()
 	{
 		return noOfFilesScanned;
+	}
+
+	int getNoOfClassFilesScanned()
+	{
+		return noOfClassFilesScanned;
 	}
 
 	private void scanFolderOrFile(File input)
@@ -193,22 +198,19 @@ final class Scanner
 			String entryName = platformEntryName(zipEntry.getName());
 			String zipEntryExtn = fileExtn(entryName);
 
-			try
+			// Note: zipEntryExtn may be null, so keeping the "class" string
+			// first in the equals check
+			if ("class".equals(zipEntryExtn))
+				findClassVersion(entryName, containerPath, zipInputStream);
+			else if (fileExtns.contains(fileExtn(entryName)))
 			{
-				// Note: zipEntryExtn may be null, so keeping the "class" string
-				// first in the equals check
-				if ("class".equals(zipEntryExtn))
-					findClassVersion(entryName, containerPath, zipInputStream);
-				else if (fileExtns.contains(fileExtn(entryName)))
-				{
-					ZipInputStream zis = new ZipInputStream(zipInputStream);
-					scanZipInputStream(containerPath + File.separatorChar + entryName, zis);
-				}
+				ZipInputStream zis = new ZipInputStream(zipInputStream);
+				scanZipInputStream(containerPath + File.separatorChar + entryName, zis);
 			}
-			finally
-			{
-				zipInputStream.closeEntry();
-			}
+
+			// Not keeping in finally as this is not a system resource (anyways file
+			// is closed in finally)
+			zipInputStream.closeEntry();
 		}
 	}
 
@@ -245,6 +247,11 @@ final class Scanner
 
 		results.add(Result.success(className,
 				Version.fromClassVersion(classMajorVersion, classMinorVersion), containerPath));
+
+		// FindBugs ignore warning note:
+		// Not a bug as only one thread updates this and other thread need
+		// not read the most recent value. i.e. 'current - 1' is okay.
+		noOfClassFilesScanned++;
 	}
 
 	List<Result> getNewResults()
