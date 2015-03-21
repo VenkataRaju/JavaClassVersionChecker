@@ -88,7 +88,15 @@ final class Scanner
 			return;
 		}
 
-		for (File child : input.listFiles(fileFilter))
+		File[] children = input.listFiles(fileFilter);
+
+		if (children == null)
+		{
+			results.add(Result.failure("Unable to read directory: " + input.getAbsolutePath()));
+			return;
+		}
+
+		for (File child : children)
 			scanFolderOrFile(child);
 	}
 
