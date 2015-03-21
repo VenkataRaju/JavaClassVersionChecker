@@ -27,10 +27,10 @@ public final class Main
 						+ "      -gv Group by Java version%n"
 						+ "   2: Lists all the files with version in the output%n"
 						+ "Path can be any folder or file which matches the provided extension(s)%n"
-						+ "e.g. 1. java -jar java-class-version-checker-<version>.jar Folder1 Folder2%n"
+						+ "e.g. 1. java -jar java-class-version-checker-<version>.jar Folder1WithJars Folder2WithJars%n"
 						+ "     2. java -jar java-class-version-checker-<version>.jar -e jar,war,ear xyz.war abc.ear Folder2%n"
 						+ "     3. java -jar java-class-version-checker-<version>.jar abc.jar%n"
-						+ "     4. java -jar java-class-version-checker-<version>.jar -e class,jar abc.jar Xyz.class FolderWhichContainsClasses%n"
+						+ "     4. java -jar java-class-version-checker-<version>.jar -e class,jar abc.jar Xyz.class FolderWithClasses FolderWithJars%n"
 						+ "Note: Except 'class' all other files (with matching extension e.g. war,zip,ear) will be considered as compressed zip files%n");
 	}
 
@@ -104,7 +104,7 @@ public final class Main
 		}, null);
 
 		ScheduledExecutorService se = Executors.newSingleThreadScheduledExecutor();
-		se.scheduleWithFixedDelay(new ProgressUpdater(verbosity, groupByContainer, scanTask, se, scanner), 100, 450, TimeUnit.MILLISECONDS);
+		se.scheduleWithFixedDelay(new ProgressUpdater(verbosity, groupByContainer, scanTask, scanner, se), 100, 450, TimeUnit.MILLISECONDS);
 
 		new Thread(scanTask).start();
 	}

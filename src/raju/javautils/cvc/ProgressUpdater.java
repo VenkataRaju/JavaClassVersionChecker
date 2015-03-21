@@ -21,6 +21,7 @@ final class ProgressUpdater implements Runnable
 {
 	private static final int MILLIS_PER_SEC = 1000, MILLIS_PER_MIN = 60000, MILLIS_PER_HOUR = 3600000;
 
+	private static final String PROGRESS_LINE_CLEARN_STRING = "%48s\r";
 	private static final int MAX_SPACE_FOR_JAR_FILE_NAME = 35;
 	private static final int SPACE_FOR_VERSION = 8;
 
@@ -28,21 +29,24 @@ final class ProgressUpdater implements Runnable
 
 	private final int verbosity;
 	private final boolean groupByContainer;
+
 	private final Future<Void> scanTask;
-	private final ExecutorService es;
 	private final Scanner scanner;
+	private final ExecutorService es;
 
 	private final Map<String, Map<Version, MutableInteger>> noOfClassesByVersionByContainerPath;
 	private final Map<Version, Set<String>> containerPathsByVersion;
 
 	private final Map<Version, List<Result.Success>> successByVersion;
 
-	ProgressUpdater(int verbosity, boolean groupByContainer, Future<Void> scanTask, ExecutorService es, Scanner scanner)
+	ProgressUpdater(int verbosity, boolean groupByContainer,
+			Future<Void> scanTask, Scanner scanner, ExecutorService es)
 	{
 		this.verbosity = verbosity;
 		this.groupByContainer = groupByContainer;
-		this.scanTask = Util.checkNotNull(scanTask);
+
 		this.es = Util.checkNotNull(es);
+		this.scanTask = Util.checkNotNull(scanTask);
 		this.scanner = Util.checkNotNull(scanner);
 
 		noOfClassesByVersionByContainerPath = (verbosity == 1 && groupByContainer)
@@ -71,6 +75,7 @@ final class ProgressUpdater implements Runnable
 		System.out.printf("%s, %s file%s, %s classe%s\r", getReadableTime(elapsedTime),
 				formatNumber(noOfFilesScanned), noOfFilesScanned != 1 ? "s" : "",
 				formatNumber(noOfClassFilesScanned), noOfClassFilesScanned != 1 ? "s" : "");
+
 		if (done)
 			System.out.println("\nCompleted");
 	}
@@ -126,7 +131,7 @@ final class ProgressUpdater implements Runnable
 	private void processNewResults()
 	{
 		// Clean "Elapsed time, noOfFilesScanned and noOfClassesScanned"
-		System.out.printf("%48s\r", "");
+		System.out.printf(PROGRESS_LINE_CLEARN_STRING, "");
 
 		for (Result result : scanner.getNewResults())
 		{
@@ -144,8 +149,8 @@ final class ProgressUpdater implements Runnable
 				{
 					Map<Version, MutableInteger> noOfClassesByVersion = noOfClassesByVersionByContainerPath.get(success.containerPath);
 					if (noOfClassesByVersion == null)
-						noOfClassesByVersionByContainerPath
-								.put(success.containerPath, noOfClassesByVersion = new TreeMap<Version, MutableInteger>());
+						noOfClassesByVersionByContainerPath.put(success.containerPath,
+								noOfClassesByVersion = new TreeMap<Version, MutableInteger>());
 
 					MutableInteger noOfClasses = noOfClassesByVersion.get(success.version);
 					if (noOfClasses == null)
@@ -197,20 +202,18 @@ final class ProgressUpdater implements Runnable
 
 				if (groupByContainer)
 				{
-					for (String containerPath : noOfClassesByVersionByContainerPath.keySet())
+					boolean moreThanOneversionInContainer = false;
+					for (Entry<String, Map<Version, MutableInteger>> entry : noOfClassesByVersionByContainerPath.entrySet())
 					{
+						String containerPath = entry.getKey();
 						String containerName = containerName(containerPath);
 						if (containerName.length() > containerNameMaxLen)
 							containerNameMaxLen = containerName.length();
-					}
 
-					boolean moreThanOneversionInContainer = false;
-					for (Map<Version, MutableInteger> map : noOfClassesByVersionByContainerPath.values())
-					{
-						if (map.size() > 1)
+						if (!moreThanOneversionInContainer)
 						{
-							moreThanOneversionInContainer = true;
-							break;
+							Map<Version, MutableInteger> map = entry.getValue();
+							moreThanOneversionInContainer = map.size() > 1;
 						}
 					}
 
@@ -218,6 +221,7 @@ final class ProgressUpdater implements Runnable
 							+ (moreThanOneversionInContainer ? 2 * SPACE_FOR_VERSION : SPACE_FOR_VERSION) + "s %s%n";
 
 					StringBuilder versionInfo = new StringBuilder();
+
 					for (Entry<String, Map<Version, MutableInteger>> entry : noOfClassesByVersionByContainerPath.entrySet())
 					{
 						String containerPath = entry.getKey();
@@ -274,7 +278,7 @@ final class ProgressUpdater implements Runnable
 			}
 		}
 
-		scanTask.get();
+		scanTask.get(); // To check for exception (if any)
 
 		System.out.println();
 	}

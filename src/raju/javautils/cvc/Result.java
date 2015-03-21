@@ -1,5 +1,6 @@
 package raju.javautils.cvc;
 
+/** Holds either {@link Success} or {@link Failure} */
 final class Result
 {
 	static final class Success
