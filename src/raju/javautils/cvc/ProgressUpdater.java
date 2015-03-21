@@ -242,13 +242,14 @@ final class ProgressUpdater implements Runnable
 					}
 				}
 				else
-				{
+				{ // groupByVersion
 					for (Set<String> containerPaths : containerPathsByVersion.values())
 					{
 						for (String containerPath : containerPaths)
 						{
-							if (containerPath.length() > containerNameMaxLen)
-								containerNameMaxLen = containerPath.length();
+							int containerNameLen = containerPath.length() - (containerPath.lastIndexOf(File.separatorChar) + 1);
+							if (containerNameLen > containerNameMaxLen)
+								containerNameMaxLen = containerNameLen;
 						}
 					}
 
