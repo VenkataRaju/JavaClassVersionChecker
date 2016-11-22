@@ -25,3 +25,33 @@ Note: Except 'class' all other files (with matching extension e.g. war,zip,ear) 
       considered as compressed zip files
 </pre>
 
+Examples:
+
+<pre>
+user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -gc ../MyApps/java-class-version-checker-0.3.jar 
+
+java-class-version-checker-0.3.jar 1.5(10)  ../MyApps
+
+00s, 1 file, 10 classes
+Completed
+user@user ~/user/MyApps $ 
+user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -gv ../MyApps/java-class-version-checker-0.3.jar 
+1.5 java-class-version-checker-0.3.jar ../MyApps
+
+00s, 1 file, 10 classes
+Completed
+user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -v 2 ../MyApps/java-class-version-checker-0.3.jar 
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/ProgressUpdater.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/MutableInteger.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Version.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Main$1.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Main.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Result$Failure.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Result$Success.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Result.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Scanner$1.class
+1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/Scanner.class
+
+00s, 1 file, 10 classes
+Completed
+</pre>
