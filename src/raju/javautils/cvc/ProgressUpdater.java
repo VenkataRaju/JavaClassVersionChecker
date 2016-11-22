@@ -80,7 +80,7 @@ final class ProgressUpdater implements Runnable
 				format(noOfClassFilesScanned), noOfClassFilesScanned != 1 ? "s" : "");
 
 		if (done)
-			System.out.printf("%nCompleted");
+			System.out.printf("%nCompleted%n");
 	}
 
 	private static String getReadableTime(int elapsedTimeInSeconds)
