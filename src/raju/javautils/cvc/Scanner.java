@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
@@ -20,7 +21,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 /**
- * Scans .class files for their Version in the folders and the archive files
+ * Scans {@code .class} files for their Version in the folders and the archive files
  * <p>
  * Note: Instances of this class can't be reused. i.e.
  * {@linkplain Scanner#scan()} method can be called only once.
@@ -43,8 +44,8 @@ final class Scanner
 	 */
 	Scanner(Collection<File> inputPathsToScan, final Set<String> fileExtns)
 	{
-		this.inputPathsToScan = Util.checkNotNull(inputPathsToScan);
-		this.fileExtns = Util.checkNotNull(fileExtns);
+		this.inputPathsToScan = inputPathsToScan;
+		this.fileExtns = fileExtns;
 		this.fileFilter = new FileFilter()
 		{
 			public boolean accept(File file)
@@ -54,7 +55,12 @@ final class Scanner
 		};
 	}
 
-	/** Note: Can be called only once */
+	/**
+	 * Note: Can be called only once
+	 * 
+	 * @throws IllegalStateException
+	 *           if called more than once
+	 */
 	void scan()
 	{
 		if (used)
@@ -70,46 +76,44 @@ final class Scanner
 		}
 	}
 
-	public int getNoOfFilesScanned()
+	int noOfFilesScanned()
 	{
 		return noOfFilesScanned;
 	}
 
-	int getNoOfClassFilesScanned()
+	int noOfClassFilesScanned()
 	{
 		return noOfClassFilesScanned;
 	}
 
 	private void scanFolderOrFile(File input)
 	{
-		if (input.isFile())
-		{
+		if (!input.exists())
+			results.add(Result.failure("Unable to find file: " + input.getAbsolutePath()));
+		else if (input.isFile()) // We don't want to read the System files so using isFile and isDirectory
 			scanFile(input);
-			return;
-		}
-
-		File[] children = input.listFiles(fileFilter);
-
-		if (children == null)
+		else if (input.isDirectory())
 		{
-			results.add(Result.failure("Unable to read directory: " + input.getAbsolutePath()));
-			return;
-		}
+			File[] children = input.listFiles(fileFilter);
 
-		for (File child : children)
-			scanFolderOrFile(child);
+			if (children == null)
+			{
+				results.add(Result.failure("Unable to read the directory: " + input.getAbsolutePath()));
+				return;
+			}
+
+			for (File child : children)
+				scanFolderOrFile(child);
+		}
 	}
 
 	private void scanFile(File file)
 	{
-		if (!file.exists())
-		{
-			results.add(Result.failure("Unable to find file: " + file.getAbsolutePath()));
-			return;
-		}
-
 		String fileName = file.getName();
 		String fileExtn = fileExtn(fileName);
+
+		if (fileExtn == null)
+			return;
 
 		if (fileExtn.equals("class"))
 		{
@@ -136,8 +140,11 @@ final class Scanner
 			{
 				zipFile = new ZipFile(file);
 
-				for (ZipEntry zipEntry : Collections.list(zipFile.entries()))
+				Enumeration<? extends ZipEntry> entries = zipFile.entries();
+				while (entries.hasMoreElements())
 				{
+					ZipEntry zipEntry = entries.nextElement();
+
 					if (zipEntry.isDirectory())
 						continue;
 
@@ -203,14 +210,18 @@ final class Scanner
 			if (zipEntry.isDirectory())
 				continue;
 
-			String entryName = platformEntryName(zipEntry.getName());
+			String entryName = zipEntry.getName();
 			String zipEntryExtn = fileExtn(entryName);
 
-			// Note: zipEntryExtn may be null, so keeping the "class" string
-			// first in the equals check
-			if ("class".equals(zipEntryExtn))
+			// fileExtns.contains(null) throws NullPointer (As we are using IgnnoreCase String comparator)
+			if (zipEntryExtn == null)
+				continue;
+
+			entryName = platformEntryName(entryName);
+
+			if (zipEntryExtn.equals("class"))
 				findClassVersion(entryName, containerPath, zipInputStream);
-			else if (fileExtns.contains(fileExtn(entryName)))
+			else if (fileExtns.contains(zipEntryExtn))
 			{
 				ZipInputStream zis = new ZipInputStream(zipInputStream);
 				scanZipInputStream(containerPath + File.separatorChar + entryName, zis);
@@ -223,16 +234,15 @@ final class Scanner
 	}
 
 	/**
-	 * File extension without dot. e.g. class for a .class file.
+	 * File extension without dot. e.g. {@code class} for a {@code .class} file.
 	 * <p>
 	 * This method expects that there is at least one character before the dot(.)
 	 * and one character after the dot(.). Otherwise returns null
 	 */
 	private static String fileExtn(String fileName)
 	{
-		int dotIndex = fileName.lastIndexOf('.');
-		return (dotIndex > 0 && ++dotIndex != fileName.length())
-				? fileName.substring(dotIndex) : null;
+		int i = fileName.lastIndexOf('.') + 1;
+		return (i != 0 && i != fileName.length()) ? fileName.substring(i) : null;
 	}
 
 	/**
@@ -253,8 +263,8 @@ final class Scanner
 		int classMinorVersion = dataIS.readShort();
 		int classMajorVersion = dataIS.readShort();
 
-		results.add(Result.success(className,
-				Version.fromClassVersion(classMajorVersion, classMinorVersion), containerPath));
+		Version classJavaVersion = Version.fromClassVersion(classMajorVersion, classMinorVersion);
+		results.add(Result.success(className, containerPath, classJavaVersion));
 
 		// FindBugs ignore warning note:
 		// Not a bug as only one thread updates this and other thread need
@@ -281,7 +291,7 @@ final class Scanner
 		}
 		catch (IOException e)
 		{
-			results.add(Result.failure("Unable to close Closeable: " + c));
+			results.add(Result.failure("Unable to close: " + c));
 		}
 	}
 }

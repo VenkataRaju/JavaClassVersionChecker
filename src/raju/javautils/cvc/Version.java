@@ -1,23 +1,23 @@
 package raju.javautils.cvc;
 
-// TODO: Load extra mappings from the external file
 final class Version implements Comparable<Version>
 {
-	// Cache from 1.2 to 1.8 Java Versions
-	private static final Version[] V_1_2_TO_V_1_8 = { new Version(1, 2, 46, 0),
-			new Version(1, 3, 47, 0), new Version(1, 4, 48, 0),
-			new Version(1, 5, 49, 0), new Version(1, 6, 50, 0),
-			new Version(1, 7, 51, 0), new Version(1, 8, 52, 0) };
+	private static final Version[] VERSIONS_CACHE = {
+			new Version(46, 0, 1, 2), new Version(47, 0, 1, 3),
+			new Version(48, 0, 1, 4), new Version(49, 0, 1, 5),
+			new Version(50, 0, 1, 6), new Version(51, 0, 1, 7),
+			new Version(52, 0, 1, 8), new Version(53, 0, 1, 9) };
 
-	final int javaMajor, javaMinor;
 	final int classMajor, classMinor;
+	final int javaMajor, javaMinor;
 
-	private Version(int javaMajor, int javaMinor, int classMajor, int classMinor)
+	private Version(int classMajor, int classMinor, int javaMajor, int javaMinor)
 	{
-		this.javaMajor = javaMajor;
-		this.javaMinor = javaMinor;
 		this.classMajor = classMajor;
 		this.classMinor = classMinor;
+
+		this.javaMajor = javaMajor;
+		this.javaMinor = javaMinor;
 	}
 
 	@Override
@@ -40,8 +40,8 @@ final class Version implements Comparable<Version>
 
 	public int compareTo(Version o)
 	{
-		return classMajor < o.classMajor ? -1 : classMajor > o.classMajor ? 1 :
-				classMinor < o.classMinor ? -1 : classMinor > o.classMinor ? 1 : 0;
+		return classMajor < o.classMajor ? -1
+				: classMajor > o.classMajor ? 1 : classMinor < o.classMinor ? -1 : classMinor > o.classMinor ? 1 : 0;
 	}
 
 	static Version fromClassVersion(int classMajor, int classMinor)
@@ -55,18 +55,23 @@ final class Version implements Comparable<Version>
 		// 1.6 -> 50
 		// 1.7 -> 51
 		// 1.8 -> 52
+		// 1.9 -> 53
 
-		if (classMajor >= 46 && classMinor <= 52)
-			return V_1_2_TO_V_1_8[classMajor - 46];
+		if (classMajor >= 46)
+		{
+			if (classMinor <= 53)
+				return VERSIONS_CACHE[classMajor - 46];
+			return new Version(classMajor, classMinor, 1, classMajor - 44 /* WARN: May Break */ );
+		}
 		if (classMajor == 45)
-			return new Version(1, (classMinor <= 3) ? 0 : 1, classMajor, classMinor);
-		return new Version(-1, -1, classMajor, classMinor);
+			return new Version(classMajor, classMinor, 1, (classMinor <= 3) ? 0 : 1);
+		return new Version(classMajor, classMinor, -1, -1);
 	}
 
 	@Override
 	public String toString()
 	{
-		return "Version [javaMajor=" + javaMajor + ", javaMinor=" + javaMinor + ", classMajor=" + classMajor + ", classMinor=" + classMinor
-				+ "]";
+		return "Version [classMajor=" + classMajor + ", classMinor=" + classMinor + ", javaMajor=" + javaMajor
+				+ ", javaMinor=" + javaMinor + "]";
 	}
 }

@@ -5,19 +5,19 @@ final class Result
 {
 	static final class Success
 	{
+		/** Can be archive(e.g. jar) or folder Path */
+		final String containerPath;
+
 		/** Can be Abc.class or x/y/z/Xyz.class */
 		final String className;
 
 		final Version version;
 
-		/** Can be archive(e.g. jar) or folder Path */
-		final String containerPath;
-
-		Success(String className, Version version, String containerPath)
+		Success(String containerPath, String className, Version version)
 		{
-			this.className = Util.checkNotNull(className);
-			this.version = Util.checkNotNull(version);
-			this.containerPath = Util.checkNotNull(containerPath);
+			this.containerPath = containerPath;
+			this.className = className;
+			this.version = version;
 		}
 	}
 
@@ -27,7 +27,7 @@ final class Result
 
 		Failure(String failureMessage)
 		{
-			this.failureMessage = Util.checkNotNull(failureMessage);
+			this.failureMessage = failureMessage;
 		}
 
 		@Override
@@ -49,9 +49,9 @@ final class Result
 		this.o = failure;
 	}
 
-	static Result success(String className, Version version, String containerPath)
+	static Result success(String containerPath, String className, Version version)
 	{
-		return new Result(new Success(className, version, containerPath));
+		return new Result(new Success(className, containerPath, version));
 	}
 
 	static Result failure(String failureMessage)

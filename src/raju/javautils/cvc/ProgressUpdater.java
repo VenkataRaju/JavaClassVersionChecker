@@ -6,6 +6,7 @@ import java.util.Formatter;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -13,25 +14,27 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import raju.javautils.cvc.Result.Success;
 
 /** Updates the progress in the Command line UI */
 final class ProgressUpdater implements Runnable
 {
-	private static final int MILLIS_PER_SEC = 1000, MILLIS_PER_MIN = 60000, MILLIS_PER_HOUR = 3600000;
+	private static final boolean COUNTRY_IS_INDIA = Locale.getDefault().getCountry().equals("IN");
+	private static final int SECONDS_PER_MIN = 60, SECONDS_PER_HOUR = 3600;
 
 	private static final String PROGRESS_LINE_CLEARN_STRING = "%48s\r";
 	private static final int MAX_SPACE_FOR_JAR_FILE_NAME = 35;
 	private static final int SPACE_FOR_VERSION = 8;
 
-	private final long startTime = System.currentTimeMillis();
+	private final long startTime = System.nanoTime();
 
 	private final int verbosity;
 	private final boolean groupByContainer;
 
-	private final Future<Void> scanTask;
 	private final Scanner scanner;
+	private final Future<Void> scanTask;
 	private final ExecutorService es;
 
 	private final Map<String, Map<Version, MutableInteger>> noOfClassesByVersionByContainerPath;
@@ -40,14 +43,14 @@ final class ProgressUpdater implements Runnable
 	private final Map<Version, List<Result.Success>> successByVersion;
 
 	ProgressUpdater(int verbosity, boolean groupByContainer,
-			Future<Void> scanTask, Scanner scanner, ExecutorService es)
+			Scanner scanner, Future<Void> scanTask, ExecutorService es)
 	{
 		this.verbosity = verbosity;
 		this.groupByContainer = groupByContainer;
 
-		this.es = Util.checkNotNull(es);
-		this.scanTask = Util.checkNotNull(scanTask);
-		this.scanner = Util.checkNotNull(scanner);
+		this.scanner = scanner;
+		this.scanTask = scanTask;
+		this.es = es;
 
 		noOfClassesByVersionByContainerPath = (verbosity == 1 && groupByContainer)
 				? new LinkedHashMap<String, Map<Version, MutableInteger>>() : null;
@@ -69,62 +72,80 @@ final class ProgressUpdater implements Runnable
 			displayResults();
 		}
 
-		int elapsedTime = (int) (System.currentTimeMillis() - startTime);
-		int noOfFilesScanned = scanner.getNoOfFilesScanned();
-		int noOfClassFilesScanned = scanner.getNoOfClassFilesScanned();
-		System.out.printf("%s, %s file%s, %s classe%s\r", getReadableTime(elapsedTime),
-				formatNumber(noOfFilesScanned), noOfFilesScanned != 1 ? "s" : "",
-				formatNumber(noOfClassFilesScanned), noOfClassFilesScanned != 1 ? "s" : "");
+		int elapsedTimeInSeconds = (int) TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime);
+		int noOfClassFilesScanned = scanner.noOfClassFilesScanned(); // This should be read before noOfFilesScanned
+		int noOfFilesScanned = scanner.noOfFilesScanned();
+		System.out.printf("%s, %s file%s, %s classe%s\r", getReadableTime(elapsedTimeInSeconds),
+				format(noOfFilesScanned), noOfFilesScanned != 1 ? "s" : "",
+				format(noOfClassFilesScanned), noOfClassFilesScanned != 1 ? "s" : "");
 
 		if (done)
-			System.out.println("\nCompleted");
+			System.out.printf("%nCompleted");
 	}
 
-	private static String getReadableTime(int elapsedTime)
+	private static String getReadableTime(int elapsedTimeInSeconds)
 	{
 		@SuppressWarnings("resource")
 		Formatter f = new Formatter();
-		boolean added = false;
+		boolean added = elapsedTimeInSeconds >= SECONDS_PER_HOUR;
 
-		if (elapsedTime >= MILLIS_PER_HOUR)
+		if (added)
 		{
-			int hours = (int) (elapsedTime / MILLIS_PER_HOUR);
-			elapsedTime %= MILLIS_PER_HOUR;
+			int hours = (int) (elapsedTimeInSeconds / SECONDS_PER_HOUR);
+			elapsedTimeInSeconds %= SECONDS_PER_HOUR;
 			f.format("%dh:", hours);
-			added = true;
 		}
-		if (added || elapsedTime >= MILLIS_PER_MIN)
+
+		if (added || elapsedTimeInSeconds >= SECONDS_PER_MIN)
 		{
-			int mins = (int) (elapsedTime / MILLIS_PER_MIN);
-			elapsedTime %= MILLIS_PER_MIN;
+			int mins = (int) (elapsedTimeInSeconds / SECONDS_PER_MIN);
+			elapsedTimeInSeconds %= SECONDS_PER_MIN;
 			f.format("%02dm:", mins);
 		}
 
-		int secs = (int) (elapsedTime / MILLIS_PER_SEC);
-		f.format("%02ds", secs);
+		f.format("%02ds", elapsedTimeInSeconds);
 
 		return f.toString();
 	}
 
-	private static String formatNumber(int num)
+	/**
+	 * Locale specific formatting for all the countries other than India.
+	 * <p>
+	 * For India: Formats number in -12,34,567 format (this is what is used in India, but unfortunately not supported)
+	 */
+	private static String format(int num)
 	{
+		if (!COUNTRY_IS_INDIA)
+			return String.format("%,d", num);
+
 		String numStr = Integer.toString(num);
 		int len = numStr.length();
-		StringBuilder sb = new StringBuilder(len + 4);
+
+		/* For every 2 digits 1 comma, except for the last 3.
+		 * Using -2 instead of -3 to avoid round of issue */
+		StringBuilder sb = new StringBuilder(len + ((len - 2) / 2));
+
+		int startIndex, initAppend;
+
 		if (num < 0)
 		{
 			sb.append('-');
-			numStr = numStr.substring(1);
-			len--;
+			startIndex = 1;
+			initAppend = (len - 4) % 2;
 		}
-		boolean evenNoOfDigits = len % 2 == 0;
-		for (int i = 0, end = len - 3; i < end; i++, evenNoOfDigits = !evenNoOfDigits)
+		else
 		{
-			sb.append(numStr.charAt(i));
-			if (evenNoOfDigits)
-				sb.append(',');
+			startIndex = 0;
+			initAppend = (len - 3) % 2;
 		}
-		sb.append(numStr.substring(Math.max(len - 3, 0)));
+
+		if (initAppend == 1)
+			sb.append(numStr.charAt(startIndex++)).append(',');
+
+		for (int end = len - 3; startIndex < end;)
+			sb.append(numStr, startIndex, startIndex += 2).append(',');
+		sb.append(numStr, startIndex, len);
+
 		return sb.toString();
 	}
 
@@ -137,7 +158,7 @@ final class ProgressUpdater implements Runnable
 		{
 			if (!result.isSuccess())
 			{
-				System.out.println(result.getFailure().failureMessage);
+				System.err.println(result.getFailure().failureMessage);
 				continue;
 			}
 
@@ -147,7 +168,8 @@ final class ProgressUpdater implements Runnable
 			{
 				if (groupByContainer)
 				{
-					Map<Version, MutableInteger> noOfClassesByVersion = noOfClassesByVersionByContainerPath.get(success.containerPath);
+					Map<Version, MutableInteger> noOfClassesByVersion = noOfClassesByVersionByContainerPath
+							.get(success.containerPath);
 					if (noOfClassesByVersion == null)
 						noOfClassesByVersionByContainerPath.put(success.containerPath,
 								noOfClassesByVersion = new TreeMap<Version, MutableInteger>());
@@ -183,7 +205,7 @@ final class ProgressUpdater implements Runnable
 		}
 		catch (Exception e)
 		{
-			System.err.printf("%nAn error occured: %s%n", e.getMessage());
+			System.err.printf("An error occured: %s%n%n", e.getMessage());
 			e.printStackTrace();
 			System.out.println();
 		}
@@ -195,7 +217,9 @@ final class ProgressUpdater implements Runnable
 		{
 			if ((groupByContainer && noOfClassesByVersionByContainerPath.isEmpty())
 					|| (!groupByContainer && containerPathsByVersion.isEmpty()))
+			{
 				System.out.println("No files/classes found");
+			}
 			else
 			{
 				int containerNameMaxLen = 0;
@@ -231,7 +255,7 @@ final class ProgressUpdater implements Runnable
 						for (Entry<Version, MutableInteger> entry2 : entry.getValue().entrySet())
 						{
 							Version version = entry2.getKey();
-							versionInfo.append(versionStr(version)).append("(").append(entry2.getValue()).append("),");
+							versionInfo.append(versionStr(version)).append("(").append(entry2.getValue().intValue()).append("),");
 						}
 
 						// Removing last comma(,)
@@ -265,7 +289,7 @@ final class ProgressUpdater implements Runnable
 			}
 		}
 		else
-		{// verbosity == 2
+		{// verbocity == 2
 			if (successByVersion.isEmpty())
 				System.out.println("No files/classes found");
 
@@ -279,26 +303,26 @@ final class ProgressUpdater implements Runnable
 			}
 		}
 
-		scanTask.get(); // To check for exception (if any)
-
 		System.out.println();
+
+		scanTask.get(); // To check for exception (if any)
 	}
 
-	private String versionStr(Version version)
+	private static String versionStr(Version version)
 	{
 		return version.javaMajor == -1
-				? "Unknown. Cls version: " + version.classMajor + "." + version.classMinor
+				? "Unknown. Class version: " + version.classMajor + "." + version.classMinor
 				: version.javaMajor + "." + version.javaMinor;
 	}
 
-	private String containerName(String containerPath)
+	private static String containerName(String containerPath)
 	{
 		return containerPath.substring(containerPath.lastIndexOf(File.separatorChar) + 1);
 	}
 
-	private String containerParent(String containerPath)
+	private static String containerParent(String containerPath)
 	{
-		int dotIndex = containerPath.lastIndexOf(File.separatorChar);
-		return containerPath.substring(0, dotIndex == -1 ? containerPath.length() : dotIndex);
+		int index = containerPath.lastIndexOf(File.separatorChar);
+		return containerPath.substring(0, index == -1 ? containerPath.length() : index);
 	}
 }
