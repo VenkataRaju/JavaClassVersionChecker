@@ -50,7 +50,8 @@ final class Scanner
 		{
 			public boolean accept(File file)
 			{
-				return file.isDirectory() || fileExtns.contains(fileExtn(file.getName()));
+				String fileExtn;
+				return file.isDirectory() || (fileExtn = fileExtn(file.getName())) != null && fileExtns.contains(fileExtn);
 			}
 		};
 	}
