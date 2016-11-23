@@ -39,8 +39,8 @@ final class Scanner
 	private volatile int noOfFilesScanned, noOfClassFilesScanned;
 
 	/**
-	 * Note: {@code extns} should not start with .(dot) e.g. for valid extensions:
-	 * jar, war, ear
+	 * Note: {@code fileExtns} should not start with .(dot)
+	 * e.g. for valid extensions: jar, war, ear
 	 */
 	Scanner(Collection<File> inputPathsToScan, final Set<String> fileExtns)
 	{
@@ -71,8 +71,10 @@ final class Scanner
 
 		for (File inputPath : inputPathsToScan)
 		{
-			if (fileFilter.accept(inputPath))
-				scanFolderOrFile(inputPath);
+			if (!inputPath.exists())
+				results.add(Result.failure("Unable to find file: " + inputPath.getPath()));
+			else if (fileFilter.accept(inputPath))
+				scanExistingFolderOrFile(inputPath);
 			else
 				results.add(Result.failure("Ignoring invalid input: " + inputPath.getPath()));
 		}
@@ -88,46 +90,41 @@ final class Scanner
 		return noOfClassFilesScanned;
 	}
 
-	private void scanFolderOrFile(File input)
+	private void scanExistingFolderOrFile(File input)
 	{
-		if (!input.exists())
-			results.add(Result.failure("Unable to find file: " + input.getAbsolutePath()));
-		else if (input.isFile()) // We don't want to read the System files so using isFile and isDirectory
-			scanFile(input);
-		else if (input.isDirectory())
+		if (input.isFile())
+			scanExistingFile(input);
+		else
 		{
 			File[] children = input.listFiles(fileFilter);
 
-			if (children == null)
-			{
-				results.add(Result.failure("Unable to read the directory: " + input.getAbsolutePath()));
-				return;
-			}
-
-			for (File child : children)
-				scanFolderOrFile(child);
+			if (children != null)
+				for (File child : children)
+					scanExistingFolderOrFile(child);
+			else
+				results.add(Result.failure("Unable to read the directory: " + input.getPath()));
 		}
 	}
 
-	private void scanFile(File file)
+	private void scanExistingFile(File file)
 	{
+		String filePath = file.getPath();
+
 		String fileName = file.getName();
 		String fileExtn = fileExtn(fileName);
 
-		if (fileExtn == null)
-			return;
-
+		// Note: fileExtn is not null here, as the file is already passed through the filter
 		if (fileExtn.equals("class"))
 		{
 			InputStream is = null;
 			try
 			{
 				is = new FileInputStream(file);
-				findClassVersion(file.getName(), file.getParentFile().getPath(), is);
+				findClassVersion(fileName, file.getParentFile().getPath(), is);
 			}
 			catch (IOException e)
 			{
-				results.add(Result.failure("IO Error: " + e.getMessage() + ", while reading: " + file.getPath()));
+				handleZipOrIoException(filePath, e);
 			}
 			finally
 			{
@@ -140,6 +137,9 @@ final class Scanner
 
 			try
 			{
+				// 1. ZipFile -> Native implementation. ZipInputStream -> Java
+				// 2. ZipFile throws exception with corrupt/invalid Zip files, ZipInputStream won't
+
 				zipFile = new ZipFile(file);
 
 				Enumeration<? extends ZipEntry> entries = zipFile.entries();
@@ -147,42 +147,49 @@ final class Scanner
 				{
 					ZipEntry zipEntry = entries.nextElement();
 
+					// WARN: Below code is somewhat similar to scanZipInputStream() but do not re factor
+
 					if (zipEntry.isDirectory())
 						continue;
 
-					String entryName = platformEntryName(zipEntry.getName());
+					String entryName = zipEntry.getName();
 					String zipEntryExtn = fileExtn(entryName);
+
+					// fileExtns.contains(null) throws NullPointer (As we are using IgnnoreCase String comparator)
+					if (zipEntryExtn == null)
+						continue;
+
+					entryName = platformEntryName(entryName);
 
 					InputStream is = null;
 					try
 					{
-						// Note: zipEntryExtn may be null, so keeping the "class" string
-						// first in the equals check
-						if ("class".equals(zipEntryExtn))
+						if (zipEntryExtn.equals("class"))
 						{
 							is = zipFile.getInputStream(zipEntry);
-							findClassVersion(entryName, file.getPath(), is);
+							findClassVersion(entryName, filePath, is);
 						}
 						else if (fileExtns.contains(fileExtn(entryName)))
 						{
 							is = zipFile.getInputStream(zipEntry);
+
+							// ZipInputStream won't throw ZipException with invalid/corrupt Zip files.
 							ZipInputStream zis = new ZipInputStream(is);
-							scanZipInputStream(file.getPath() + File.separatorChar + entryName, zis);
+
+							scanZipInputStream(filePath + File.separatorChar + entryName, zis);
 						}
 					}
 					finally
 					{
+						// We need to close this InputStream as ZipFile keeps
+						// all open streams as they are until we close the ZipFile
 						close(is);
 					}
 				}
 			}
-			catch (ZipException e)
-			{
-				results.add(Result.failure("Unable to open file: " + file.getPath()));
-			}
 			catch (IOException e)
 			{
-				results.add(Result.failure("IO Error: " + e.getMessage() + ", while reading: " + file.getPath()));
+				handleZipOrIoException(filePath, e);
 			}
 			finally
 			{
@@ -194,7 +201,7 @@ final class Scanner
 				}
 				catch (IOException e)
 				{
-					results.add(Result.failure("Unable to close zip file: " + file.getPath()));
+					results.add(Result.failure("Unable to close ZIP file: " + filePath));
 				}
 			}
 		}
@@ -205,10 +212,19 @@ final class Scanner
 		noOfFilesScanned++;
 	}
 
+	private void handleZipOrIoException(String pathOfTheEntryWhichCausedException, IOException e)
+	{
+		String zipOrIo = (e instanceof ZipException) ? "ZIP" : "IO";
+		results.add(Result.failure(zipOrIo + " error: " + e.getMessage()
+				+ ", while reading: " + pathOfTheEntryWhichCausedException));
+	}
+
 	private void scanZipInputStream(String containerPath, ZipInputStream zipInputStream) throws IOException
 	{
 		for (ZipEntry zipEntry; (zipEntry = zipInputStream.getNextEntry()) != null;)
 		{
+			// WARN: Below code is somewhat similar to scanExistingFile() but do not re factor
+
 			if (zipEntry.isDirectory())
 				continue;
 
@@ -228,10 +244,6 @@ final class Scanner
 				ZipInputStream zis = new ZipInputStream(zipInputStream);
 				scanZipInputStream(containerPath + File.separatorChar + entryName, zis);
 			}
-
-			// Not keeping in finally as this is not a system resource (anyways file
-			// is closed in finally)
-			zipInputStream.closeEntry();
 		}
 	}
 
