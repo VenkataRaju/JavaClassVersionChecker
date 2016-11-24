@@ -29,17 +29,17 @@ Examples:
 
 <pre>
 user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -gc ../MyApps/java-class-version-checker-0.3.jar 
-
 java-class-version-checker-0.3.jar 1.5(10)  ../MyApps
 
 00s, 1 file, 10 classes
 Completed
-user@user ~/user/MyApps $ 
+
 user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -gv ../MyApps/java-class-version-checker-0.3.jar 
 1.5 java-class-version-checker-0.3.jar ../MyApps
 
 00s, 1 file, 10 classes
 Completed
+
 user@user ~/user/MyApps $ java -jar java-class-version-checker-0.3.jar -v 2 ../MyApps/java-class-version-checker-0.3.jar 
 1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/ProgressUpdater.class
 1.5 ../MyApps/java-class-version-checker-0.3.jar/raju/javautils/cvc/MutableInteger.class
